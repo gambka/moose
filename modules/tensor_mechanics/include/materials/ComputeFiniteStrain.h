@@ -31,6 +31,7 @@ private:
   enum class DecompMethod
   {
     TaylorExpansion,
+    TaylorExpansionSM,
     EigenSolution
   };
 

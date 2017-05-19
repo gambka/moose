@@ -74,7 +74,7 @@
 [Modules/TensorMechanics/Master]
   [./all]
     volumetric_locking_correction = false
-    decomposition_method = TaylorExpansion
+    decomposition_method = EigenSolution
     incremental = true
     strain = FINITE
   [../]

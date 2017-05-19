@@ -38,6 +38,7 @@ protected:
   };
 
   DecompMethod _decomp_method;
+  bool _higher_order_terms;
 
   ColumnMajorMatrix _incremental_rotation;
   ColumnMajorMatrix _Uhat;

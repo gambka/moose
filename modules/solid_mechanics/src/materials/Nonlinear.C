@@ -21,6 +21,7 @@ Nonlinear::Nonlinear(SolidModel & solid_model,
                      const InputParameters & parameters)
   : Element(solid_model, name, parameters),
     _decomp_method(RashidApprox),
+    _higher_order_terms(false),
     _incremental_rotation(3, 3),
     _Uhat(3, 3)
 {
@@ -42,6 +43,7 @@ Nonlinear::Nonlinear(SolidModel & solid_model,
   {
     mooseError("The options for the increment calculation are RashidApprox and Eigen.");
   }
+  _higher_order_terms = solid_model.getParam<bool>("higher_order_terms");
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -110,12 +112,27 @@ Nonlinear::computeStrainIncrement(const ColumnMajorMatrix & Fhat, SymmTensor & s
   const Real Uzy = Fhat(2, 1);
   const Real Uzz = Fhat(2, 2);
 
+  // std::cout << "Uxx: " << Uxx << std::endl;
+  // std::cout << "Uxy: " << Uxy << std::endl;
+  // std::cout << "Uxz: " << Uxz << std::endl;
+  // std::cout << "Uyy: " << Uyy << std::endl;
+  // std::cout << "Uyz: " << Uyz << std::endl;
+  // std::cout << "Uzz: " << Uzz << std::endl;
+
   const Real Axx = Uxx * Uxx + Uyx * Uyx + Uzx * Uzx - 1.0;
   const Real Axy = Uxx * Uxy + Uyx * Uyy + Uzx * Uzy;
   const Real Axz = Uxx * Uxz + Uyx * Uyz + Uzx * Uzz;
   const Real Ayy = Uxy * Uxy + Uyy * Uyy + Uzy * Uzy - 1.0;
   const Real Ayz = Uxy * Uxz + Uyy * Uyz + Uzy * Uzz;
   const Real Azz = Uxz * Uxz + Uyz * Uyz + Uzz * Uzz - 1.0;
+
+  // std::cout << "Axx: " << Axx << std::endl;
+  // std::cout << "Axy: " << Axy << std::endl;
+  // std::cout << "Axz: " << Axz << std::endl;
+  // std::cout << "Ayy: " << Ayy << std::endl;
+  // std::cout << "Ayz: " << Ayz << std::endl;
+  // std::cout << "Azz: " << Azz << std::endl;
+
 
   const Real Bxx = 0.25 * Axx - 0.5;
   const Real Bxy = 0.25 * Axy;
@@ -130,6 +147,7 @@ Nonlinear::computeStrainIncrement(const ColumnMajorMatrix & Fhat, SymmTensor & s
   strain_increment.yy(-(Bxy * Axy + Byy * Ayy + Byz * Ayz));
   strain_increment.yz(-(Bxy * Axz + Byy * Ayz + Byz * Azz));
   strain_increment.zz(-(Bxz * Axz + Byz * Ayz + Bzz * Azz));
+
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -153,13 +171,20 @@ Nonlinear::computePolarDecomposition(const ColumnMajorMatrix & Fhat)
   const Real Ax = Uyz - Uzy;
   const Real Ay = Uzx - Uxz;
   const Real Az = Uxy - Uyx;
+
   const Real Q = 0.25 * (Ax * Ax + Ay * Ay + Az * Az);
   const Real traceF = Uxx + Uyy + Uzz;
   const Real P = 0.25 * (traceF - 1) * (traceF - 1);
   const Real Y = 1 / ((Q + P) * (Q + P) * (Q + P));
 
   const Real C1 = std::sqrt(P * (1 + (P * (Q + Q + (Q + P))) * (1 - (Q + P)) * Y));
-  const Real C2 = 0.125 + Q * 0.03125 * (P * P - 12 * (P - 1)) / (P * P);
+  Real C2 = 0.125 + Q * 0.03125 * (P * P - 12 * (P - 1)) / (P * P);
+
+
+
+  if (_higher_order_terms)
+    C2 += (Q * Q * (P - 2) * (P * P - 10 * P  + 32)) / (P * P * P) + (Q * Q * Q * (1104 - 992 * P + 376 * P * P - 72 * P * P * P + 5 * P * P * P * P)) / (512 * P * P * P * P);
+
   const Real C3 = 0.5 * std::sqrt((P * Q * (3 - Q) + P * P * P + Q * Q) * Y);
 
   // Since the input to this routine is the incremental deformation gradient

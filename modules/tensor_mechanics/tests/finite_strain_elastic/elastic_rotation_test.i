@@ -67,6 +67,7 @@
       [./all]
         strain = FINITE
         add_variables = true
+        decomposition_method = TaylorExpansion
         generate_output = 'stress_xx stress_yy stress_zz stress_xy stress_yz stress_zx'
       [../]
     [../]
@@ -135,9 +136,9 @@
     type = ComputeFiniteStrainElasticStress
   [../]
   [./elasticity_tensor]
-    type = ComputeElasticityTensor
-    fill_method = symmetric9
-    C_ijkl = '1.5e6 0.75e6 0.75e6 1.5e6 0.75e6 1.5e6 0.375e6 0.375e6 0.375e6'
+    type = ComputeIsotropicElasticityTensor
+    youngs_modulus =1e6
+    poissons_ratio = 0.3
   [../]
 []
 

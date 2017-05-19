@@ -213,8 +213,12 @@ Element::polarDecompositionEigen(const ColumnMajorMatrix & Fhat,
   ColumnMajorMatrix invUhat(ND, ND);
   invertMatrix(Uhat, invUhat);
 
-  Rhat = Fhat * invUhat;
 
+
+  std::cout << "Rotation Increment" << std::endl;
+  Rhat.print();
+
+  std::cout << "Strain Increment: " << strain_increment << std::endl;
   strain_increment =
       N1 * N1.transpose() * log1 + N2 * N2.transpose() * log2 + N3 * N3.transpose() * log3;
 }

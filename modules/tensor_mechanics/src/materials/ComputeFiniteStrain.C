@@ -15,7 +15,7 @@
 MooseEnum
 ComputeFiniteStrain::decompositionType()
 {
-  return MooseEnum("TaylorExpansion EigenSolution", "TaylorExpansion");
+  return MooseEnum("TaylorExpansion TaylorExpansionSM EigenSolution", "TaylorExpansion");
 }
 
 template <>
@@ -134,7 +134,8 @@ ComputeFiniteStrain::computeQpIncrements(RankTwoTensor & total_strain_increment,
   {
     case DecompMethod::TaylorExpansion:
     {
-      // inverse of _Fhat
+
+      //inverse of _Fhat
       RankTwoTensor invFhat(_Fhat[_qp].inverse());
 
       // A = I - _Fhat^-1
@@ -145,13 +146,14 @@ ComputeFiniteStrain::computeQpIncrements(RankTwoTensor & total_strain_increment,
       RankTwoTensor Cinv_I = A * A.transpose() - A - A.transpose();
 
       // strain rate D from Taylor expansion, Chat = (-1/2(Chat^-1 - I) + 1/4*(Chat^-1 - I)^2 + ...
-      total_strain_increment = -Cinv_I * 0.5 + Cinv_I * Cinv_I * 0.25;
+      total_strain_increment = -Cinv_I * 0.5 + Cinv_I * Cinv_I * 0.25;// - 0.16666667 * Cinv_I * Cinv_I * Cinv_I + Cinv_I * Cinv_I * Cinv_I * Cinv_I / 8.0 - Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I / 10.0 + Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I / 12.0 - Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I / 14.0 + Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I / 16.0 + Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I * Cinv_I / 18.0;
 
       const Real a[3] = {invFhat(1, 2) - invFhat(2, 1),
                          invFhat(2, 0) - invFhat(0, 2),
                          invFhat(0, 1) - invFhat(1, 0)};
 
       Real q = (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]) / 4.0;
+
       Real trFhatinv_1 = invFhat.trace() - 1.0;
       const Real p = trFhatinv_1 * trFhatinv_1 / 4.0;
 
@@ -166,18 +168,80 @@ ComputeFiniteStrain::computeQpIncrements(RankTwoTensor & total_strain_increment,
         C2 = (1.0 - C1) / (4.0 * q);
       else
         // alternate form for small q
-        C2 = 0.125 + q * 0.03125 * (Utility::pow<2>(p) - 12.0 * (p - 1.0)) / Utility::pow<2>(p) +
-             Utility::pow<2>(q) * (p - 2.0) * (Utility::pow<2>(p) - 10.0 * p + 32.0) /
-                 Utility::pow<3>(p) +
-             Utility::pow<3>(q) * (1104.0 - 992.0 * p + 376.0 * Utility::pow<2>(p) -
-                                   72.0 * Utility::pow<3>(p) + 5.0 * Utility::pow<4>(p)) /
-                 (512.0 * Utility::pow<4>(p));
-      const Real C3 =
-          0.5 * std::sqrt((p * q * (3.0 - q) + Utility::pow<3>(p) + Utility::pow<2>(q)) /
-                          Utility::pow<3>(p + q)); // sin theta_a/(2 sqrt(q))
+        C2 =
+            0.125 + q * 0.03125 * (Utility::pow<2>(p) - 12.0 * (p - 1.0)) / Utility::pow<2>(p) +
+            Utility::pow<2>(q) * (p - 2.0) * (Utility::pow<2>(p) - 10.0 * p + 32.0) / Utility::pow<3>(p) +
+            Utility::pow<3>(q) * (1104.0 - 992.0 * p + 376.0 * Utility::pow<2>(p) -
+                                72.0 * Utility::pow<3>(p) + 5.0 * Utility::pow<4>(p)) /
+                (512.0 * Utility::pow<4>(p));
+
+      const Real C3 = 0.5 * std::sqrt((p * q * (3.0 - q) + Utility::pow<3>(p) + Utility::pow<2>(q)) /
+                                      Utility::pow<3>(p + q)); // sin theta_a/(2 sqrt(q))
 
       // Calculate incremental rotation. Note that this value is the transpose of that from Rashid,
       // 93, so we transpose it before storing
+      RankTwoTensor R_incr;
+      R_incr.addIa(C1);
+      for (unsigned int i = 0; i < 3; ++i)
+        for (unsigned int j = 0; j < 3; ++j)
+          R_incr(i, j) += C2 * a[i] * a[j];
+
+      R_incr(0, 1) += C3 * a[2];
+      R_incr(0, 2) -= C3 * a[1];
+      R_incr(1, 0) -= C3 * a[2];
+      R_incr(1, 2) += C3 * a[0];
+      R_incr(2, 0) += C3 * a[1];
+      R_incr(2, 1) -= C3 * a[0];
+
+      rotation_increment = R_incr;
+      break;
+    }
+
+    case DecompMethod::TaylorExpansionSM:
+    {
+      // Solid Mechanics Method (using Fhat rather than Fhat_inv)
+      RankTwoTensor transFhat(_Fhat[_qp].transpose());
+
+      RankTwoTensor Iden(RankTwoTensor::initIdentity);
+
+      RankTwoTensor C = transFhat * _Fhat[_qp];
+
+      RankTwoTensor C_I = C - Iden;
+
+      total_strain_increment = 0.5 * C_I - 0.25 * C_I * C_I;// + 0.16666667 * C_I * C_I * C_I - C_I * C_I * C_I * C_I / 8.0  + C_I * C_I * C_I * C_I * C_I / 10.0 - C_I * C_I * C_I * C_I * C_I * C_I / 12.0 + C_I * C_I * C_I * C_I * C_I * C_I * C_I / 14.0 - C_I * C_I * C_I * C_I * C_I * C_I * C_I * C_I / 16.0 + C_I * C_I * C_I * C_I * C_I * C_I * C_I * C_I + C_I / 18.0;
+
+      const Real a[3] = {_Fhat[_qp](1, 2) - _Fhat[_qp](2, 1),
+                         _Fhat[_qp](2, 0) - _Fhat[_qp](0, 2),
+                         _Fhat[_qp](0, 1) - _Fhat[_qp](1, 0)};
+
+      Real q = (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]) / 4.0;
+
+      Real trace_1 = _Fhat[_qp].trace() - 1.0;
+      const Real p = trace_1 * trace_1 / 4.0;
+
+      // cos theta_a
+      const Real C1 =
+          std::sqrt(p + 3.0 * Utility::pow<2>(p) * (1.0 - (p + q)) / Utility::pow<2>(p + q) -
+                    2.0 * Utility::pow<3>(p) * (1.0 - (p + q)) / Utility::pow<3>(p + q));
+
+      Real C2;
+      if (q > 0.01)
+        // (1-cos theta_a)/4q
+        C2 = (1.0 - C1) / (4.0 * q);
+      else
+        // alternate form for small q
+        C2 =
+            0.125 + q * 0.03125 * (Utility::pow<2>(p) - 12.0 * (p - 1.0)) / Utility::pow<2>(p) +
+            Utility::pow<2>(q) * (p - 2.0) * (Utility::pow<2>(p) - 10.0 * p + 32.0) / Utility::pow<3>(p) +
+            Utility::pow<3>(q) * (1104.0 - 992.0 * p + 376.0 * Utility::pow<2>(p) -
+                                72.0 * Utility::pow<3>(p) + 5.0 * Utility::pow<4>(p)) /
+                (512.0 * Utility::pow<4>(p));
+
+      const Real C3 = 0.5 * std::sqrt((p * q * (3.0 - q) + Utility::pow<3>(p) + Utility::pow<2>(q)) /
+                                      Utility::pow<3>(p + q)); // sin theta_a/(2 sqrt(q))
+
+      // Calculate incremental rotation. Note that this value is the transpose of that from Rashid,
+      // 93.
       RankTwoTensor R_incr;
       R_incr.addIa(C1);
       for (unsigned int i = 0; i < 3; ++i)
@@ -218,6 +282,7 @@ ComputeFiniteStrain::computeQpIncrements(RankTwoTensor & total_strain_increment,
 
       total_strain_increment =
           N1 * std::log(lambda1) + N2 * std::log(lambda2) + N3 * std::log(lambda3);
+
       break;
     }
 

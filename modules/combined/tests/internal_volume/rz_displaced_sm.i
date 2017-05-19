@@ -122,7 +122,8 @@
     youngs_modulus = 1e6
     poissons_ratio = 0.3
     formulation = NonlinearRZ
-    increment_calculation = Eigen
+    increment_calculation = RashidApprox
+    higher_order_terms = true
   [../]
 []
 
