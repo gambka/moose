@@ -197,6 +197,7 @@ findContactPoint(PenetrationInfo & p_info,
   p_info._closest_point_ref = ref_point;
   p_info._closest_point = phys_point[0];
   p_info._distance = d.norm();
+  std::cout << "Pinfo Distance: " << p_info._distance << std::endl;
 
   if (dim - 1 == 2)
   {

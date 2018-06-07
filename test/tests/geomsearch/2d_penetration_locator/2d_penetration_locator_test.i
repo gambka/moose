@@ -1,5 +1,5 @@
 [Mesh]
-  file = 2d_contact_test.e
+  file = two_layers.e
 []
 
 [Variables]
@@ -223,5 +223,8 @@
 
 [Outputs]
   file_base = out
-  exodus = true
+  [./out]
+    type = Exodus
+    output_dimension = 3
+  [../]
 []
