@@ -88,6 +88,9 @@ validParams<ContactAction>()
 
   params.addParam<Real>("al_frictional_force_tolerance",
                         "The tolerance of the frictional force for augmented Lagrangian method.");
+  MooseEnum outOfPlaneDirection("x y z", "z");
+  params.addParam<MooseEnum>(
+      "out_of_plane_direction", outOfPlaneDirection, "The out-of-plane direction in two-dimensional contact.");
   return params;
 }
 
@@ -97,7 +100,9 @@ ContactAction::ContactAction(const InputParameters & params)
     _slave(getParam<BoundaryName>("slave")),
     _model(getParam<std::string>("model")),
     _formulation(getParam<MooseEnum>("formulation")),
-    _system(getParam<MooseEnum>("system"))
+    _system(getParam<MooseEnum>("system")),
+    _out_of_plane_direction(
+        getParam<MooseEnum>("out_of_plane_direction").getEnum<OutOfPlaneDirection>())
 {
   if (_formulation == "tangential_penalty")
   {
@@ -152,7 +157,14 @@ ContactAction::act()
   // convert vector of NonlinearVariableName to vector of VariableName
   std::vector<VariableName> coupled_displacements(ndisp);
   for (unsigned int i = 0; i < ndisp; ++i)
+  {
+    // if (_out_of_plane_direction == OutOfPlaneDirection::x && i == 0)
+    //   continue;
+    // else if (_out_of_plane_direction == OutOfPlaneDirection::y && i == 1)
+    //   continue;
+
     coupled_displacements[i] = displacements[i];
+  }
 
   if (_current_task == "add_dirac_kernel")
   {
@@ -171,6 +183,12 @@ ContactAction::act()
       for (unsigned int i = 0; i < ndisp; ++i)
       {
         std::string name = action_name + "_constraint_" + Moose::stringify(i);
+
+        // Set appropriate components for constraints for 2D contact problems).
+        // if (_out_of_plane_direction == OutOfPlaneDirection::x && i == 0)
+        //   continue;
+        // else if (_out_of_plane_direction == OutOfPlaneDirection::y && i == 1)
+        //   continue;
 
         params.set<unsigned int>("component") = i;
         params.set<NonlinearVariableName>("variable") = displacements[i];
@@ -193,6 +211,13 @@ ContactAction::act()
         for (unsigned int i = 0; i < ndisp; ++i)
         {
           std::string name = action_name + "_master_" + Moose::stringify(i);
+
+          // Set appropriate components for dirac kernels for 2D contact problems).
+          // if (_out_of_plane_direction == OutOfPlaneDirection::x && i == 0)
+          //   continue;
+          // else if (_out_of_plane_direction == OutOfPlaneDirection::y && i == 1)
+          //   continue;
+
           params.set<unsigned int>("component") = i;
           params.set<NonlinearVariableName>("variable") = displacements[i];
           _problem->addDiracKernel("ContactMaster", name, params);
@@ -211,6 +236,13 @@ ContactAction::act()
         for (unsigned int i = 0; i < ndisp; ++i)
         {
           std::string name = action_name + "_slave_" + Moose::stringify(i);
+
+          // Set appropriate components for dirac kernels for 2D contact problems).
+          // if (_out_of_plane_direction == OutOfPlaneDirection::x && i == 0)
+          //   continue;
+          // else if (_out_of_plane_direction == OutOfPlaneDirection::y && i == 1)
+          //   continue;
+
           params.set<unsigned int>("component") = i;
           params.set<NonlinearVariableName>("variable") = displacements[i];
           _problem->addDiracKernel("SlaveConstraint", name, params);

@@ -147,13 +147,17 @@ MechanicalContactConstraint::MechanicalContactConstraint(const InputParameters &
 {
   _overwrite_slave_residual = false;
 
+  std::cout << "Here 1: " << std::endl;
   if (isParamValid("displacements"))
   {
     // modern parameter scheme for displacements
     for (unsigned int i = 0; i < coupledComponents("displacements"); ++i)
     {
       _vars[i] = coupled("displacements", i);
+      std::cout << "Vars: " << _vars[i] << std::endl;
       _var_objects[i] = getVar("displacements", i);
+
+      std::cout << "Var Objects: " << _var_objects[i] << std::endl;
     }
   }
   else
@@ -512,8 +516,13 @@ MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo, bool u
   RealVectorValue res_vec;
   for (unsigned int i = 0; i < _mesh_dimension; ++i)
   {
-    dof_id_type dof_number = node->dof_number(0, _vars[i], 0);
-    res_vec(i) = _residual_copy(dof_number) / _var_objects[i]->scalingFactor();
+    if (_vars[i] < 100)
+    {
+      dof_id_type dof_number = node->dof_number(0, _vars[i], 0);
+      res_vec(i) = _residual_copy(dof_number) / _var_objects[i]->scalingFactor();
+    }
+    else
+      res_vec(i) = 0;
   }
 
   RealVectorValue distance_vec(_mesh.nodeRef(node->id()) - pinfo->_closest_point);

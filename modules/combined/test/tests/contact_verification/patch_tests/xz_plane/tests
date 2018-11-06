@@ -1,0 +1,12 @@
+[Tests]
+  [./xz_plane_frictionless_kin]
+    type = 'CSVDiff'
+    input = 'xz_plane.i'
+    csvdiff = 'xz_plane_frictionless_kin_check.csv xz_plane_frictionless_kin_check_cont_press_0001.csv xz_plane_frictionless_kin_check_x_disp_0001.csv'
+    cli_args = 'Outputs/file_base=xz_plane_frictionless_kin_out Outputs/chkfile/file_base=plane1_glued_kin_check'
+    rel_err = 1e-5
+    abs_zero = 1e-8
+    max_parallel = 1
+    superlu = true
+  [../]
+[]

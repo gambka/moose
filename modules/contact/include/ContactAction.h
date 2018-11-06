@@ -32,6 +32,15 @@ protected:
   const std::string _model;
   const std::string _formulation;
   const MooseEnum _system;
+
+  enum class OutOfPlaneDirection
+  {
+    x,
+    y,
+    z
+  };
+
+  const OutOfPlaneDirection _out_of_plane_direction;
 };
 
 #endif // CONTACTACTION_H
